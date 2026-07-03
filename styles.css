@@ -750,6 +750,13 @@ textarea::placeholder {
   padding: 25px 26px 27px;
 }
 
+.post-meta-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .post-meta {
   display: inline-flex;
   gap: 8px;
@@ -761,6 +768,33 @@ textarea::placeholder {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.04em;
+}
+
+.post-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.post-action {
+  padding: 5px 8px;
+  border: 1px solid var(--ink);
+  border-radius: 100px;
+  background: var(--white);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  transition: 120ms ease;
+}
+
+.post-action:hover {
+  background: var(--butter);
+  transform: translateY(-1px);
+}
+
+.post-action[data-action="delete"]:hover {
+  color: var(--white);
+  background: var(--orange);
 }
 
 .post:nth-child(3n + 2) .post-meta {
@@ -795,6 +829,104 @@ textarea::placeholder {
   content: "#JUSTBECAUSE";
   font-family: var(--mono);
   font-size: 9px;
+}
+
+.edit-form {
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px dashed var(--ink);
+}
+
+.edit-form[hidden] {
+  display: none;
+}
+
+.edit-message {
+  min-height: 125px;
+  margin: 0;
+  padding: 13px;
+  border-radius: 9px;
+  background-color: #f7f2ff;
+  font-size: 14px;
+  line-height: 30px;
+}
+
+.edit-media-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.edit-photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.edit-photo-button,
+.remove-photo-button {
+  padding: 7px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 100px;
+  background: var(--pink-soft);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.remove-photo-button {
+  background: var(--white);
+}
+
+.remove-photo-button.is-active {
+  color: var(--white);
+  background: var(--orange);
+}
+
+.edit-file-name {
+  max-width: 160px;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  justify-content: flex-end;
+}
+
+.edit-cancel,
+.edit-save {
+  padding: 8px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 100px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.edit-cancel {
+  background: var(--white);
+}
+
+.edit-save {
+  background: var(--acid);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.edit-save:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .empty {
@@ -867,6 +999,84 @@ footer > span {
 .toast.show {
   opacity: 1;
   transform: translateY(0) rotate(1deg);
+}
+
+.delete-dialog {
+  width: min(430px, calc(100% - 32px));
+  padding: 38px 32px 30px;
+  overflow: visible;
+  border: var(--line);
+  border-radius: 18px;
+  color: var(--ink);
+  background: var(--butter);
+  box-shadow: 10px 10px 0 var(--ink);
+}
+
+.delete-dialog::backdrop {
+  background: rgba(75, 93, 255, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.dialog-sticker {
+  position: absolute;
+  top: -24px;
+  right: 22px;
+  display: grid;
+  width: 70px;
+  height: 70px;
+  place-items: center;
+  border: var(--line);
+  border-radius: 50%;
+  background: var(--pink);
+  box-shadow: 4px 4px 0 var(--ink);
+  font-family: var(--display);
+  font-size: 12px;
+  transform: rotate(9deg);
+}
+
+.delete-dialog h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 40px;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.delete-dialog p {
+  margin: 20px 0 25px;
+  font-size: 13px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.dialog-cancel,
+.dialog-confirm {
+  padding: 10px 13px;
+  border: var(--line);
+  border-radius: 100px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.dialog-cancel {
+  background: var(--white);
+}
+
+.dialog-confirm {
+  color: var(--white);
+  background: var(--orange);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.dialog-confirm:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .sr-only {
@@ -1091,6 +1301,26 @@ footer > span {
 
   .post-body {
     padding: 22px 21px 24px;
+  }
+
+  .post-meta-row {
+    align-items: flex-start;
+  }
+
+  .post-actions {
+    gap: 4px;
+  }
+
+  .post-action {
+    padding: 5px 7px;
+  }
+
+  .delete-dialog {
+    padding: 34px 22px 24px;
+  }
+
+  .delete-dialog h2 {
+    font-size: 34px;
   }
 
   footer {

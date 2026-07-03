@@ -22,9 +22,13 @@ const previewWrap = document.querySelector("#image-preview-wrap");
 const preview = document.querySelector("#image-preview");
 const removeImageButton = document.querySelector("#remove-image");
 const toast = document.querySelector("#toast");
+const deleteDialog = document.querySelector("#delete-dialog");
+const cancelDeleteButton = document.querySelector("#cancel-delete");
+const confirmDeleteButton = document.querySelector("#confirm-delete");
 
 let toastTimer;
 let previewUrl;
+let pendingDeletePost = null;
 
 function showToast(message) {
   toast.textContent = message;
@@ -50,6 +54,8 @@ function getPublicImageUrl(path) {
 function createPostElement(post) {
   const article = document.createElement("article");
   article.className = "post";
+  article.dataset.postId = post.id;
+  article.dataset.imagePath = post.image_path || "";
 
   if (post.image_path) {
     const imageWrap = document.createElement("div");
@@ -68,16 +74,96 @@ function createPostElement(post) {
   const body = document.createElement("div");
   body.className = "post-body";
 
+  const metaRow = document.createElement("div");
+  metaRow.className = "post-meta-row";
+
   const meta = document.createElement("time");
   meta.className = "post-meta";
   meta.dateTime = post.created_at;
   meta.textContent = formatDate(post.created_at);
 
+  const actions = document.createElement("div");
+  actions.className = "post-actions";
+
+  const editButton = document.createElement("button");
+  editButton.className = "post-action";
+  editButton.type = "button";
+  editButton.dataset.action = "edit";
+  editButton.textContent = "EDIT";
+  editButton.setAttribute("aria-label", "게시물 수정");
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "post-action";
+  deleteButton.type = "button";
+  deleteButton.dataset.action = "delete";
+  deleteButton.textContent = "DELETE";
+  deleteButton.setAttribute("aria-label", "게시물 삭제");
+
+  actions.append(editButton, deleteButton);
+  metaRow.append(meta, actions);
+
   const message = document.createElement("p");
   message.className = "post-message";
   message.textContent = post.message;
 
-  body.append(meta, message);
+  const editForm = document.createElement("form");
+  editForm.className = "edit-form";
+  editForm.hidden = true;
+
+  const editMessage = document.createElement("textarea");
+  editMessage.className = "edit-message";
+  editMessage.maxLength = 500;
+  editMessage.required = true;
+  editMessage.value = post.message;
+  editMessage.setAttribute("aria-label", "게시물 내용 수정");
+
+  const editMediaRow = document.createElement("div");
+  editMediaRow.className = "edit-media-row";
+
+  const editPhotoLabel = document.createElement("label");
+  editPhotoLabel.className = "edit-photo-button";
+  editPhotoLabel.textContent = post.image_path ? "REPLACE PIC" : "ADD A PIC";
+
+  const editPhotoInput = document.createElement("input");
+  editPhotoInput.className = "edit-photo-input";
+  editPhotoInput.type = "file";
+  editPhotoInput.accept = ALLOWED_TYPES.join(",");
+
+  const editFileName = document.createElement("span");
+  editFileName.className = "edit-file-name";
+  editFileName.textContent = "NO NEW FILE";
+
+  editPhotoLabel.append(editPhotoInput);
+  editMediaRow.append(editPhotoLabel, editFileName);
+
+  if (post.image_path) {
+    const removePhotoButton = document.createElement("button");
+    removePhotoButton.className = "remove-photo-button";
+    removePhotoButton.type = "button";
+    removePhotoButton.dataset.action = "remove-photo";
+    removePhotoButton.dataset.removeImage = "false";
+    removePhotoButton.textContent = "REMOVE PIC";
+    editMediaRow.append(removePhotoButton);
+  }
+
+  const editActions = document.createElement("div");
+  editActions.className = "edit-actions";
+
+  const editCancel = document.createElement("button");
+  editCancel.className = "edit-cancel";
+  editCancel.type = "button";
+  editCancel.dataset.action = "cancel-edit";
+  editCancel.textContent = "CANCEL";
+
+  const editSave = document.createElement("button");
+  editSave.className = "edit-save";
+  editSave.type = "submit";
+  editSave.textContent = "SAVE CHANGES";
+
+  editActions.append(editCancel, editSave);
+  editForm.append(editMessage, editMediaRow, editActions);
+
+  body.append(metaRow, message, editForm);
   article.append(body);
   return article;
 }
@@ -170,6 +256,204 @@ photoInput.addEventListener("change", () => {
 
 removeImageButton.addEventListener("click", clearSelectedImage);
 refreshButton.addEventListener("click", () => loadPosts());
+
+function setEditMode(article, enabled) {
+  const message = article.querySelector(".post-message");
+  const editForm = article.querySelector(".edit-form");
+  const editButton = article.querySelector('[data-action="edit"]');
+
+  message.hidden = enabled;
+  editForm.hidden = !enabled;
+  editButton.textContent = enabled ? "EDITING" : "EDIT";
+  editButton.disabled = enabled;
+
+  if (enabled) {
+    editForm.querySelector(".edit-message").focus();
+  }
+}
+
+feed.addEventListener("change", (event) => {
+  if (!event.target.matches(".edit-photo-input")) return;
+
+  const input = event.target;
+  const fileName = input
+    .closest(".edit-media-row")
+    .querySelector(".edit-file-name");
+  const [file] = input.files;
+
+  if (!file) {
+    fileName.textContent = "NO NEW FILE";
+    return;
+  }
+
+  try {
+    validatePhoto(file);
+    fileName.textContent = file.name;
+    const removeButton = input
+      .closest(".edit-media-row")
+      .querySelector(".remove-photo-button");
+    if (removeButton) {
+      removeButton.dataset.removeImage = "false";
+      removeButton.classList.remove("is-active");
+      removeButton.textContent = "REMOVE PIC";
+    }
+  } catch (error) {
+    input.value = "";
+    fileName.textContent = "NO NEW FILE";
+    showToast(error.message);
+  }
+});
+
+feed.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  const article = button.closest(".post");
+  const action = button.dataset.action;
+
+  if (action === "edit") {
+    feed.querySelectorAll(".post").forEach((postArticle) => {
+      if (postArticle !== article) setEditMode(postArticle, false);
+    });
+    setEditMode(article, true);
+  }
+
+  if (action === "cancel-edit") {
+    const formElement = article.querySelector(".edit-form");
+    formElement.querySelector(".edit-message").value =
+      article.querySelector(".post-message").textContent;
+    formElement.querySelector(".edit-photo-input").value = "";
+    formElement.querySelector(".edit-file-name").textContent = "NO NEW FILE";
+    const removeButton = formElement.querySelector(".remove-photo-button");
+    if (removeButton) {
+      removeButton.dataset.removeImage = "false";
+      removeButton.classList.remove("is-active");
+      removeButton.textContent = "REMOVE PIC";
+    }
+    setEditMode(article, false);
+  }
+
+  if (action === "remove-photo") {
+    const shouldRemove = button.dataset.removeImage !== "true";
+    button.dataset.removeImage = String(shouldRemove);
+    button.classList.toggle("is-active", shouldRemove);
+    button.textContent = shouldRemove ? "PIC WILL BE REMOVED" : "REMOVE PIC";
+    if (shouldRemove) {
+      const input = article.querySelector(".edit-photo-input");
+      input.value = "";
+      article.querySelector(".edit-file-name").textContent = "NO NEW FILE";
+    }
+  }
+
+  if (action === "delete") {
+    pendingDeletePost = {
+      article,
+      id: Number(article.dataset.postId),
+      imagePath: article.dataset.imagePath || null,
+    };
+    deleteDialog.showModal();
+  }
+});
+
+feed.addEventListener("submit", async (event) => {
+  if (!event.target.matches(".edit-form")) return;
+  event.preventDefault();
+
+  const editForm = event.target;
+  const article = editForm.closest(".post");
+  const id = Number(article.dataset.postId);
+  const oldImagePath = article.dataset.imagePath || null;
+  const message = editForm.querySelector(".edit-message").value.trim();
+  const [newFile] = editForm.querySelector(".edit-photo-input").files;
+  const removeButton = editForm.querySelector(".remove-photo-button");
+  const shouldRemoveImage = removeButton?.dataset.removeImage === "true";
+  const saveButton = editForm.querySelector(".edit-save");
+
+  if (!message) {
+    showToast("수정할 내용을 입력해주세요.");
+    return;
+  }
+
+  saveButton.disabled = true;
+  saveButton.textContent = "SAVING...";
+  let uploadedImagePath = null;
+
+  try {
+    if (newFile) uploadedImagePath = await uploadPhoto(newFile);
+
+    const nextImagePath = uploadedImagePath
+      ? uploadedImagePath
+      : shouldRemoveImage
+        ? null
+        : oldImagePath;
+
+    const { error } = await db
+      .from("posts")
+      .update({ message, image_path: nextImagePath })
+      .eq("id", id);
+    if (error) throw error;
+
+    if (oldImagePath && oldImagePath !== nextImagePath) {
+      const { error: storageError } = await db.storage
+        .from(STORAGE_BUCKET)
+        .remove([oldImagePath]);
+      if (storageError) {
+        console.warn("Old image cleanup failed", storageError);
+      }
+    }
+
+    showToast("게시물을 수정했어요.");
+    await loadPosts({ quiet: true });
+  } catch (error) {
+    if (uploadedImagePath) {
+      await db.storage.from(STORAGE_BUCKET).remove([uploadedImagePath]);
+    }
+    showToast(`수정 실패: ${error.message}`);
+    saveButton.disabled = false;
+    saveButton.textContent = "SAVE CHANGES";
+  }
+});
+
+cancelDeleteButton.addEventListener("click", () => {
+  pendingDeletePost = null;
+  deleteDialog.close();
+});
+
+deleteDialog.addEventListener("close", () => {
+  if (!confirmDeleteButton.disabled) pendingDeletePost = null;
+});
+
+confirmDeleteButton.addEventListener("click", async () => {
+  if (!pendingDeletePost) return;
+
+  confirmDeleteButton.disabled = true;
+  confirmDeleteButton.textContent = "DELETING...";
+  const { id, imagePath } = pendingDeletePost;
+
+  try {
+    const { error } = await db.from("posts").delete().eq("id", id);
+    if (error) throw error;
+
+    if (imagePath) {
+      const { error: storageError } = await db.storage
+        .from(STORAGE_BUCKET)
+        .remove([imagePath]);
+      if (storageError) {
+        console.warn("Image cleanup failed", storageError);
+      }
+    }
+
+    deleteDialog.close();
+    pendingDeletePost = null;
+    showToast("게시물을 삭제했어요.");
+    await loadPosts({ quiet: true });
+  } catch (error) {
+    showToast(`삭제 실패: ${error.message}`);
+  } finally {
+    confirmDeleteButton.disabled = false;
+    confirmDeleteButton.textContent = "YEP, DELETE";
+  }
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();

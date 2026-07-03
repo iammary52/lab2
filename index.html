@@ -131,7 +131,7 @@
               </button>
             </div>
             <p class="public-note">
-              ⚠ 로그인 없음 · 전부 공개 · 너무 사적인 건 마음속에만
+              ⚠ 로그인 없음 · 전부 공개 · 누구나 수정/삭제 가능
             </p>
           </form>
         </section>
@@ -172,5 +172,22 @@
     </footer>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <dialog id="delete-dialog" class="delete-dialog">
+      <div class="dialog-sticker" aria-hidden="true">WAIT!</div>
+      <h2>Delete this drop?</h2>
+      <p>
+        게시물과 첨부 사진이 완전히 사라져요.<br />
+        이건 되돌릴 수 없습니다.
+      </p>
+      <div class="dialog-actions">
+        <button id="cancel-delete" class="dialog-cancel" type="button">
+          NEVER MIND
+        </button>
+        <button id="confirm-delete" class="dialog-confirm" type="button">
+          YEP, DELETE
+        </button>
+      </div>
+    </dialog>
   </body>
 </html>
