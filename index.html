@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f7f2ea" />
+    <meta name="theme-color" content="#ff5ea8" />
     <meta
       name="description"
-      content="사진과 짧은 메모로 오늘을 기록하는 공개 게시판"
+      content="사진과 짧은 메모로 오늘을 남기는 공개 소셜 보드"
     />
-    <title>오늘의 조각</title>
+    <title>오늘의 조각 — Drop your moment</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Noto+Sans+KR:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
@@ -23,99 +23,152 @@
     <script src="./app.js" defer></script>
   </head>
   <body>
+    <div class="noise" aria-hidden="true"></div>
+
     <header class="site-header">
       <a class="brand" href="./" aria-label="오늘의 조각 홈">
-        <span class="brand-mark">○</span>
+        <span class="brand-spark" aria-hidden="true">✦</span>
         <span>오늘의 조각</span>
       </a>
-      <span class="public-badge"><i></i> public board</span>
+      <div class="header-center" aria-hidden="true">EST. RIGHT NOW</div>
+      <span class="public-badge"><i></i> live & public</span>
     </header>
 
     <main>
       <section class="hero" aria-labelledby="hero-title">
-        <p class="eyebrow">A LITTLE PIECE OF TODAY</p>
-        <h1 id="hero-title">스쳐 가기 전에,<br />오늘을 남겨요.</h1>
-        <p class="hero-copy">
-          사진 한 장과 짧은 메모. 거창하지 않아도 좋은<br class="desktop-only" />
-          우리들의 작은 공개 기록장입니다.
-        </p>
-      </section>
+        <div class="hero-sticker sticker-smile" aria-hidden="true">
+          <span>☺</span>
+          <small>GOOD VIBES<br />ONLY-ish</small>
+        </div>
+        <div class="hero-sticker sticker-star" aria-hidden="true">★</div>
+        <div class="hero-sticker sticker-arrow" aria-hidden="true">↘</div>
 
-      <section class="composer" aria-labelledby="composer-title">
-        <div class="composer-heading">
-          <div>
-            <p class="section-kicker">NEW PIECE</p>
-            <h2 id="composer-title">새 조각 남기기</h2>
+        <p class="eyebrow">
+          <span>01</span>
+          YOUR UNFILTERED LITTLE LIFE
+        </p>
+        <h1 id="hero-title">
+          DROP<br />
+          <span>YOUR</span> MOMENT
+        </h1>
+        <div class="hero-bottom">
+          <p class="hero-copy">
+            완벽한 피드 말고, 진짜 오늘.<br />
+            사진 한 장과 지금의 기분을 툭 남겨요.
+          </p>
+          <div class="hero-note" aria-hidden="true">
+            <span>NO ACCOUNT</span>
+            <strong>NO PRESSURE</strong>
           </div>
-          <span id="char-count">0 / 500</span>
+        </div>
+      </section>
+    </main>
+
+    <div class="ticker" aria-hidden="true">
+      <div>
+        POST IT ✦ KEEP IT REAL ✦ MAKE THE INTERNET PERSONAL AGAIN ✦
+        POST IT ✦ KEEP IT REAL ✦ MAKE THE INTERNET PERSONAL AGAIN ✦
+      </div>
+    </div>
+
+    <main class="content">
+      <section class="composer-wrap" aria-labelledby="composer-title">
+        <div class="composer-label" aria-hidden="true">
+          <span>HOT TAKE</span>
+          <span>OR</span>
+          <span>SOFT LAUNCH?</span>
         </div>
 
-        <form id="post-form">
-          <label class="sr-only" for="message">메모</label>
-          <textarea
-            id="message"
-            name="message"
-            maxlength="500"
-            placeholder="지금 어떤 순간을 보내고 있나요?"
-            required
-          ></textarea>
-
-          <div id="image-preview-wrap" class="image-preview-wrap" hidden>
-            <img id="image-preview" alt="선택한 사진 미리보기" />
-            <button
-              id="remove-image"
-              class="remove-image"
-              type="button"
-              aria-label="선택한 사진 제거"
-            >
-              ×
-            </button>
+        <section class="composer">
+          <div class="composer-heading">
+            <div>
+              <p class="section-kicker">ADD TO THE TIMELINE</p>
+              <h2 id="composer-title">What's the vibe?</h2>
+            </div>
+            <span id="char-count">0 / 500</span>
           </div>
 
-          <div class="composer-actions">
-            <label class="photo-button" for="photo">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M4 7.5h3l1.5-2h7l1.5 2h3v11H4z" />
-                <circle cx="12" cy="13" r="3.2" />
-              </svg>
-              사진 고르기
-            </label>
-            <input
-              id="photo"
-              name="photo"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-            />
-            <button id="submit-button" class="submit-button" type="submit">
-              <span>기록하기</span>
-              <span aria-hidden="true">↗</span>
-            </button>
+          <form id="post-form">
+            <label class="sr-only" for="message">메모</label>
+            <textarea
+              id="message"
+              name="message"
+              maxlength="500"
+              placeholder="오늘 있었던 일, 머릿속을 맴도는 말, 아무거나..."
+              required
+            ></textarea>
+
+            <div id="image-preview-wrap" class="image-preview-wrap" hidden>
+              <img id="image-preview" alt="선택한 사진 미리보기" />
+              <button
+                id="remove-image"
+                class="remove-image"
+                type="button"
+                aria-label="선택한 사진 제거"
+              >
+                ×
+              </button>
+              <span class="preview-tape" aria-hidden="true"></span>
+            </div>
+
+            <div class="composer-actions">
+              <label class="photo-button" for="photo">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M4 7.5h3l1.5-2h7l1.5 2h3v11H4z" />
+                  <circle cx="12" cy="13" r="3.2" />
+                </svg>
+                <span>ADD A PIC</span>
+              </label>
+              <input
+                id="photo"
+                name="photo"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+              />
+              <button id="submit-button" class="submit-button" type="submit">
+                <span>POST IT</span>
+                <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+            <p class="public-note">
+              ⚠ 로그인 없음 · 전부 공개 · 너무 사적인 건 마음속에만
+            </p>
+          </form>
+        </section>
+
+        <aside class="composer-aside" aria-hidden="true">
+          <div class="aside-card">
+            <span>THIS SPACE IS</span>
+            <strong>YOURS*</strong>
+            <small>*and literally everyone else's</small>
           </div>
-          <p class="public-note">
-            이곳은 로그인 없이 누구나 볼 수 있는 공개 게시판입니다.
-          </p>
-        </form>
+          <div class="scribble">be so fr</div>
+        </aside>
       </section>
 
       <section class="feed-section" aria-labelledby="feed-title">
         <div class="feed-heading">
           <div>
-            <p class="section-kicker">RECENT PIECES</p>
-            <h2 id="feed-title">최근 기록</h2>
+            <p class="section-kicker">THE GROUP CHAT, BUT PUBLIC</p>
+            <h2 id="feed-title">Fresh drops</h2>
           </div>
           <button id="refresh-button" class="refresh-button" type="button">
-            새로고침 <span aria-hidden="true">↻</span>
+            REFRESH <span aria-hidden="true">↻</span>
           </button>
         </div>
 
+        <div class="feed-divider" aria-hidden="true">
+          <span>✦</span><span>SCROLL FOR THE LORE</span><span>✦</span>
+        </div>
         <div id="status" class="status" role="status">기록을 불러오는 중...</div>
         <div id="feed" class="feed" aria-live="polite"></div>
       </section>
     </main>
 
     <footer>
-      <span>오늘의 조각</span>
-      <span>Small moments, kept together.</span>
+      <a class="footer-brand" href="./">오늘의 조각™</a>
+      <p>made for oversharing responsibly</p>
+      <span>SEOUL ↔ THE INTERNET</span>
     </footer>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

@@ -109,7 +109,7 @@ async function loadPosts({ quiet = false } = {}) {
     const empty = document.createElement("div");
     empty.className = "empty";
     empty.innerHTML =
-      "<strong>아직 남겨진 조각이 없어요.</strong>첫 번째 오늘을 기록해보세요.";
+      "<strong>THE TIMELINE IS EMPTY</strong>첫 번째 조각을 툭 던져보세요. 아무 말이나 진짜 환영.";
     feed.append(empty);
     return;
   }
@@ -182,7 +182,7 @@ form.addEventListener("submit", async (event) => {
   }
 
   submitButton.disabled = true;
-  submitButton.querySelector("span").textContent = "기록 중...";
+  submitButton.querySelector("span").textContent = "POSTING...";
   let imagePath = null;
 
   try {
@@ -206,7 +206,7 @@ form.addEventListener("submit", async (event) => {
     showToast(`기록 실패: ${error.message}`);
   } finally {
     submitButton.disabled = false;
-    submitButton.querySelector("span").textContent = "기록하기";
+    submitButton.querySelector("span").textContent = "POST IT";
   }
 });
 
