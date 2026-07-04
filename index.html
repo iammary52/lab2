@@ -17,11 +17,12 @@
     />
     <link rel="stylesheet" href="./styles.css?v=theme-1" />
     <link rel="stylesheet" href="./theme.css?v=theme-1" />
+    <link rel="stylesheet" href="./auth.css?v=auth-1" />
     <script
       src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"
       defer
     ></script>
-    <script src="./app.js?v=theme-1" defer></script>
+    <script src="./app.js?v=auth-1" defer></script>
   </head>
   <body data-theme="default">
     <div class="noise" aria-hidden="true"></div>
@@ -51,6 +52,15 @@
         >
           HITEL
         </button>
+      </div>
+      <div class="auth-control">
+        <button id="open-auth" class="auth-open" type="button">
+          LOGIN / JOIN
+        </button>
+        <div id="auth-session" class="auth-session" hidden>
+          <span id="auth-email"></span>
+          <button id="sign-out" type="button">LOG OUT</button>
+        </div>
       </div>
     </header>
 
@@ -151,7 +161,7 @@
               </button>
             </div>
             <p class="public-note">
-              ⚠ 로그인 없음 · 전부 공개 · 누구나 수정/삭제 가능
+              ⚠ 누구나 열람 · 로그인한 작성자만 작성/수정/삭제
             </p>
           </form>
         </section>
@@ -192,6 +202,60 @@
     </footer>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <dialog id="auth-dialog" class="auth-dialog">
+      <button
+        id="close-auth"
+        class="auth-close"
+        type="button"
+        aria-label="닫기"
+      >
+        ×
+      </button>
+      <p class="section-kicker">MEMBERS ONLY TO POST</p>
+      <h2 id="auth-title">Welcome back</h2>
+      <div class="auth-tabs" role="tablist" aria-label="인증 방식">
+        <button
+          class="auth-tab is-active"
+          type="button"
+          data-auth-mode="signin"
+          aria-pressed="true"
+        >
+          LOGIN
+        </button>
+        <button
+          class="auth-tab"
+          type="button"
+          data-auth-mode="signup"
+          aria-pressed="false"
+        >
+          JOIN
+        </button>
+      </div>
+      <form id="auth-form">
+        <label for="auth-email-input">EMAIL</label>
+        <input
+          id="auth-email-input"
+          name="email"
+          type="email"
+          autocomplete="email"
+          required
+        />
+        <label for="auth-password">PASSWORD</label>
+        <input
+          id="auth-password"
+          name="password"
+          type="password"
+          minlength="8"
+          autocomplete="current-password"
+          required
+        />
+        <button id="auth-submit" class="auth-submit" type="submit">
+          LOGIN
+        </button>
+        <p id="auth-message" class="auth-message" role="status"></p>
+      </form>
+    </dialog>
 
     <dialog id="delete-dialog" class="delete-dialog">
       <div class="dialog-sticker" aria-hidden="true">WAIT!</div>
