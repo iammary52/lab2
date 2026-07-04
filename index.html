@@ -15,14 +15,14 @@
       href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=social-2" />
+    <link rel="stylesheet" href="./styles.css?v=theme-1" />
     <script
       src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"
       defer
     ></script>
-    <script src="./app.js?v=social-2" defer></script>
+    <script src="./app.js?v=theme-1" defer></script>
   </head>
-  <body>
+  <body data-theme="default">
     <div class="noise" aria-hidden="true"></div>
 
     <header class="site-header">
@@ -32,6 +32,25 @@
       </a>
       <div class="header-center" aria-hidden="true">EST. RIGHT NOW</div>
       <span class="public-badge"><i></i> live & public</span>
+      <div class="theme-switch" aria-label="테마 선택">
+        <span>THEME</span>
+        <button
+          class="theme-choice is-active"
+          type="button"
+          data-theme-choice="default"
+          aria-pressed="true"
+        >
+          NOW
+        </button>
+        <button
+          class="theme-choice"
+          type="button"
+          data-theme-choice="hitel"
+          aria-pressed="false"
+        >
+          HITEL
+        </button>
+      </div>
     </header>
 
     <main>
