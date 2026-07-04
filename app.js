@@ -6,6 +6,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const LIKED_KEY = "today-pieces-liked-posts-v1";
 const THEME_KEY = "today-pieces-theme-v1";
+const AUTH_REDIRECT_URL = "https://iammary52.github.io/lab2/";
+const LEGACY_AUTHOR_ID = "ad490b76-13dd-4b24-9979-10ca2555783f";
 
 const db = window.supabase.createClient(
   SUPABASE_URL,
@@ -28,11 +30,27 @@ const deleteDialog = document.querySelector("#delete-dialog");
 const cancelDeleteButton = document.querySelector("#cancel-delete");
 const confirmDeleteButton = document.querySelector("#confirm-delete");
 const themeButtons = [...document.querySelectorAll(".theme-choice")];
+const openAuthButton = document.querySelector("#open-auth");
+const authSession = document.querySelector("#auth-session");
+const authEmail = document.querySelector("#auth-email");
+const signOutButton = document.querySelector("#sign-out");
+const authDialog = document.querySelector("#auth-dialog");
+const closeAuthButton = document.querySelector("#close-auth");
+const authForm = document.querySelector("#auth-form");
+const authTitle = document.querySelector("#auth-title");
+const authEmailInput = document.querySelector("#auth-email-input");
+const authPasswordInput = document.querySelector("#auth-password");
+const authSubmit = document.querySelector("#auth-submit");
+const authMessage = document.querySelector("#auth-message");
+const authTabs = [...document.querySelectorAll(".auth-tab")];
+const photoButton = document.querySelector(".photo-button");
 
 let toastTimer;
 let previewUrl;
 let pendingDeletePost = null;
 let likedPosts = readLikedPosts();
+let currentUser = null;
+let authMode = "signin";
 
 function setTheme(theme) {
   const nextTheme = theme === "hitel" ? "hitel" : "default";
@@ -68,6 +86,64 @@ function showToast(message) {
   toast.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+}
+
+function isOwner(authorId) {
+  return Boolean(currentUser && currentUser.id === authorId);
+}
+
+function getAuthorLabel(authorId) {
+  if (authorId === LEGACY_AUTHOR_ID) return "A@NAVER.COM";
+  if (isOwner(authorId)) return "YOU";
+  return `MEMBER ${String(authorId).slice(0, 4).toUpperCase()}`;
+}
+
+function setAuthMode(mode) {
+  authMode = mode === "signup" ? "signup" : "signin";
+  const isSignup = authMode === "signup";
+  authTitle.textContent = isSignup ? "Join the timeline" : "Welcome back";
+  authSubmit.textContent = isSignup ? "CREATE ACCOUNT" : "LOGIN";
+  authPasswordInput.autocomplete = isSignup
+    ? "new-password"
+    : "current-password";
+  authMessage.textContent = "";
+  authTabs.forEach((tab) => {
+    const isActive = tab.dataset.authMode === authMode;
+    tab.classList.toggle("is-active", isActive);
+    tab.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+function openAuth(mode = "signin") {
+  setAuthMode(mode);
+  if (!authDialog.open) authDialog.showModal();
+  authEmailInput.focus();
+}
+
+function renderAuthState() {
+  const signedIn = Boolean(currentUser);
+  openAuthButton.hidden = signedIn;
+  authSession.hidden = !signedIn;
+  authEmail.textContent = signedIn ? currentUser.email : "";
+
+  if (signedIn && authDialog.open) authDialog.close();
+}
+
+async function initializeAuth() {
+  const { data, error } = await db.auth.getSession();
+  if (error) showToast(`세션 확인 실패: ${error.message}`);
+  currentUser = data.session?.user || null;
+  renderAuthState();
+  await loadPosts();
+
+  db.auth.onAuthStateChange((_event, session) => {
+    const previousId = currentUser?.id;
+    currentUser = session?.user || null;
+    renderAuthState();
+    if (previousId !== currentUser?.id) {
+      setTimeout(() => loadPosts({ quiet: true }), 0);
+    }
+  });
 }
 
 function formatDate(value) {
@@ -121,7 +197,12 @@ function createCommentElement(comment) {
   deleteButton.dataset.action = "delete-comment";
   deleteButton.textContent = "DEL";
 
-  tools.append(meta, editButton, deleteButton);
+  const author = document.createElement("span");
+  author.className = "comment-author";
+  author.textContent = getAuthorLabel(comment.author_id);
+
+  tools.append(meta, author);
+  if (isOwner(comment.author_id)) tools.append(editButton, deleteButton);
   bubble.append(message, tools);
 
   const editForm = document.createElement("form");
@@ -190,10 +271,13 @@ function createSocialArea(post) {
   commentInput.required = true;
   commentInput.placeholder = "say less, comment more";
   commentInput.setAttribute("aria-label", "댓글");
+  commentInput.readOnly = !currentUser;
+  if (!currentUser) commentInput.placeholder = "login to comment";
 
   const commentButton = document.createElement("button");
   commentButton.type = "submit";
   commentButton.textContent = "SEND";
+  commentButton.disabled = !currentUser;
 
   commentForm.append(commentInput, commentButton);
   social.append(socialTop, commentList, commentForm);
@@ -249,7 +333,12 @@ function createPostElement(post) {
   deleteButton.setAttribute("aria-label", "게시물 삭제");
 
   actions.append(editButton, deleteButton);
-  metaRow.append(meta, actions);
+  const author = document.createElement("span");
+  author.className = "post-author";
+  author.textContent = getAuthorLabel(post.author_id);
+
+  metaRow.append(meta, author);
+  if (isOwner(post.author_id)) metaRow.append(actions);
 
   const message = document.createElement("p");
   message.className = "post-message";
@@ -327,7 +416,7 @@ async function loadPosts({ quiet = false } = {}) {
   const { data, error } = await db
     .from("posts")
     .select(
-      "id, message, image_path, created_at, likes_count, comments(id, post_id, message, created_at, updated_at)",
+      "id, message, image_path, created_at, likes_count, author_id, comments(id, post_id, message, created_at, updated_at, author_id)",
     )
     .order("created_at", { ascending: false })
     .limit(50);
@@ -389,6 +478,16 @@ messageInput.addEventListener("input", () => {
   charCount.textContent = `${messageInput.value.length} / 500`;
 });
 
+messageInput.addEventListener("focus", () => {
+  if (!currentUser) openAuth("signup");
+});
+
+photoButton.addEventListener("click", (event) => {
+  if (currentUser) return;
+  event.preventDefault();
+  openAuth("signup");
+});
+
 photoInput.addEventListener("change", () => {
   const [file] = photoInput.files;
   if (!file) return clearSelectedImage();
@@ -412,6 +511,7 @@ function setEditMode(article, enabled) {
   const message = article.querySelector(".post-message");
   const editForm = article.querySelector(".edit-form");
   const editButton = article.querySelector('[data-action="edit"]');
+  if (!editForm || !editButton) return;
 
   message.hidden = enabled;
   editForm.hidden = !enabled;
@@ -466,6 +566,11 @@ feed.addEventListener("change", (event) => {
 });
 
 feed.addEventListener("click", (event) => {
+  if (!currentUser && event.target.closest(".comment-input")) {
+    openAuth("signup");
+    return;
+  }
+
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
@@ -635,6 +740,11 @@ async function likePost(button) {
 }
 
 async function addComment(commentForm) {
+  if (!currentUser) {
+    openAuth("signup");
+    return;
+  }
+
   const article = commentForm.closest(".post");
   const input = commentForm.querySelector(".comment-input");
   const button = commentForm.querySelector("button");
@@ -652,6 +762,7 @@ async function addComment(commentForm) {
     const { error } = await db.from("comments").insert({
       post_id: Number(article.dataset.postId),
       message,
+      author_id: currentUser.id,
     });
     if (error) throw error;
 
@@ -757,6 +868,12 @@ confirmDeleteButton.addEventListener("click", async () => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!currentUser) {
+    openAuth("signup");
+    showToast("가입 또는 로그인 후 게시할 수 있어요.");
+    return;
+  }
+
   const message = messageInput.value.trim();
   const [file] = photoInput.files;
   if (!message) {
@@ -775,6 +892,7 @@ form.addEventListener("submit", async (event) => {
     const { error } = await db.from("posts").insert({
       message,
       image_path: imagePath,
+      author_id: currentUser.id,
     });
     if (error) throw error;
 
@@ -794,4 +912,59 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-loadPosts();
+openAuthButton.addEventListener("click", () => openAuth("signin"));
+closeAuthButton.addEventListener("click", () => authDialog.close());
+authTabs.forEach((tab) => {
+  tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode));
+});
+
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = authEmailInput.value.trim();
+  const password = authPasswordInput.value;
+
+  authSubmit.disabled = true;
+  authSubmit.textContent =
+    authMode === "signup" ? "CREATING..." : "LOGGING IN...";
+  authMessage.textContent = "";
+
+  try {
+    if (authMode === "signup") {
+      const { data, error } = await db.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: AUTH_REDIRECT_URL },
+      });
+      if (error) throw error;
+
+      if (data.session) {
+        showToast("가입과 로그인이 완료됐어요.");
+      } else {
+        authMessage.textContent =
+          "인증 이메일을 보냈어요. 이메일 인증 후 로그인해주세요.";
+      }
+    } else {
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      authForm.reset();
+      showToast("로그인했어요.");
+    }
+  } catch (error) {
+    authMessage.textContent = error.message;
+  } finally {
+    authSubmit.disabled = false;
+    authSubmit.textContent =
+      authMode === "signup" ? "CREATE ACCOUNT" : "LOGIN";
+  }
+});
+
+signOutButton.addEventListener("click", async () => {
+  const { error } = await db.auth.signOut();
+  if (error) {
+    showToast(`로그아웃 실패: ${error.message}`);
+    return;
+  }
+  showToast("로그아웃했어요.");
+});
+
+initializeAuth();
