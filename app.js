@@ -5,6 +5,7 @@ const STORAGE_BUCKET = "post-images";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const LIKED_KEY = "today-pieces-liked-posts-v1";
+const THEME_KEY = "today-pieces-theme-v1";
 
 const db = window.supabase.createClient(
   SUPABASE_URL,
@@ -26,11 +27,29 @@ const toast = document.querySelector("#toast");
 const deleteDialog = document.querySelector("#delete-dialog");
 const cancelDeleteButton = document.querySelector("#cancel-delete");
 const confirmDeleteButton = document.querySelector("#confirm-delete");
+const themeButtons = [...document.querySelectorAll(".theme-choice")];
 
 let toastTimer;
 let previewUrl;
 let pendingDeletePost = null;
 let likedPosts = readLikedPosts();
+
+function setTheme(theme) {
+  const nextTheme = theme === "hitel" ? "hitel" : "default";
+  document.body.dataset.theme = nextTheme;
+  localStorage.setItem(THEME_KEY, nextTheme);
+  themeButtons.forEach((button) => {
+    const isActive = button.dataset.themeChoice === nextTheme;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+setTheme(localStorage.getItem(THEME_KEY));
+
+themeButtons.forEach((button) => {
+  button.addEventListener("click", () => setTheme(button.dataset.themeChoice));
+});
 
 function readLikedPosts() {
   try {
