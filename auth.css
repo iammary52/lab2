@@ -1,0 +1,236 @@
+.site-header {
+  grid-template-columns: 1fr auto auto auto auto;
+}
+
+.auth-control {
+  justify-self: end;
+}
+
+.auth-open,
+.auth-session {
+  min-height: 42px;
+  border: var(--line);
+  border-radius: 100px;
+  background: var(--acid);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.auth-open {
+  padding: 9px 13px;
+  cursor: pointer;
+}
+
+.auth-session {
+  display: flex;
+  gap: 8px;
+  padding: 5px 5px 5px 11px;
+  align-items: center;
+  max-width: 250px;
+}
+
+.auth-session[hidden] {
+  display: none;
+}
+
+.auth-session span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-session button {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  border: 1px solid var(--ink);
+  border-radius: 100px;
+  color: var(--white);
+  background: var(--ink);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8px;
+}
+
+.auth-dialog {
+  width: min(440px, calc(100% - 28px));
+  padding: 34px;
+  overflow: visible;
+  border: var(--line);
+  border-radius: 18px;
+  color: var(--ink);
+  background: var(--white);
+  box-shadow: 10px 10px 0 var(--ink);
+}
+
+.auth-dialog::backdrop {
+  background: rgba(75, 93, 255, 0.62);
+  backdrop-filter: blur(5px);
+}
+
+.auth-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0 0 2px;
+  place-items: center;
+  border: var(--line);
+  border-radius: 50%;
+  color: var(--white);
+  background: var(--ink);
+  cursor: pointer;
+  font-size: 22px;
+}
+
+.auth-dialog h2 {
+  margin: 0 0 24px;
+  max-width: 340px;
+  font-family: var(--display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 0.98;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 5px;
+  border: var(--line);
+  border-radius: 100px;
+  background: var(--pink-soft);
+}
+
+.auth-tab {
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: 100px;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.auth-tab.is-active {
+  border-color: var(--ink);
+  color: var(--white);
+  background: var(--ink);
+}
+
+#auth-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+#auth-form label {
+  margin-top: 7px;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+#auth-form input {
+  width: 100%;
+  padding: 12px 14px;
+  border: var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--cream);
+}
+
+.auth-submit {
+  margin-top: 10px;
+  padding: 12px 15px;
+  border: var(--line);
+  border-radius: 100px;
+  background: var(--acid);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  font-family: var(--display);
+  font-size: 13px;
+}
+
+.auth-submit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.auth-message {
+  min-height: 20px;
+  margin: 7px 0 0;
+  color: var(--orange);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.post-author {
+  margin-right: auto;
+  padding: 4px 7px;
+  border: 1px dashed var(--ink);
+  border-radius: 100px;
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.comment-author {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+body[data-theme="hitel"] .auth-dialog {
+  border-style: dashed;
+  box-shadow:
+    0 0 24px rgba(0, 240, 255, 0.35),
+    var(--shadow);
+}
+
+body[data-theme="hitel"] .auth-dialog::backdrop {
+  background: rgba(0, 12, 16, 0.82);
+}
+
+@media (max-width: 1050px) {
+  .site-header {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .header-center {
+    display: none;
+  }
+
+  .auth-control {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .auth-open,
+  .auth-session {
+    width: 100%;
+    justify-content: center;
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-header,
+  body[data-theme="hitel"] .site-header {
+    height: 166px;
+  }
+
+  .auth-dialog {
+    padding: 30px 22px 24px;
+  }
+
+  .auth-dialog h2 {
+    font-size: 34px;
+  }
+}
