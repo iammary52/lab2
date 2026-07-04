@@ -9,10 +9,37 @@ const THEME_KEY = "today-pieces-theme-v1";
 const AUTH_REDIRECT_URL = "https://iammary52.github.io/lab2/";
 const LEGACY_AUTHOR_ID = "ad490b76-13dd-4b24-9979-10ca2555783f";
 
-const db = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_PUBLISHABLE_KEY,
-);
+const MESSAGE_MAXLEN = 500;
+const COMMENT_MAXLEN = 280;
+const FEED_LIMIT = 50;
+const TOAST_DURATION = 3200;
+const REALTIME_DEBOUNCE = 600;
+const TIME_TICK = 60 * 1000;
+
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+/**
+ * Tiny declarative element builder.
+ * `props` maps to DOM properties when possible, otherwise attributes.
+ * Special keys: `class`, `dataset` (object), `html` (innerHTML).
+ * Nullish / false children and props are skipped.
+ */
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (value == null || value === false) continue;
+    if (key === "class") node.className = value;
+    else if (key === "dataset") Object.assign(node.dataset, value);
+    else if (key === "html") node.innerHTML = value;
+    else if (key in node) node[key] = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) {
+    if (child == null || child === false) continue;
+    node.append(child);
+  }
+  return node;
+}
 
 const form = document.querySelector("#post-form");
 const messageInput = document.querySelector("#message");
@@ -51,6 +78,7 @@ let pendingDeletePost = null;
 let likedPosts = readLikedPosts();
 let currentUser = null;
 let authMode = "signin";
+const seenPostIds = new Set();
 
 function setTheme(theme) {
   const nextTheme = theme === "hitel" ? "hitel" : "default";
@@ -85,7 +113,11 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), TOAST_DURATION);
+}
+
+function errorToast(prefix, error) {
+  showToast(`${prefix}: ${error?.message ?? error}`);
 }
 
 function isOwner(authorId) {
@@ -131,10 +163,11 @@ function renderAuthState() {
 
 async function initializeAuth() {
   const { data, error } = await db.auth.getSession();
-  if (error) showToast(`세션 확인 실패: ${error.message}`);
+  if (error) errorToast("세션 확인 실패", error);
   currentUser = data.session?.user || null;
   renderAuthState();
   await loadPosts();
+  subscribeToChanges();
 
   db.auth.onAuthStateChange((_event, session) => {
     const previousId = currentUser?.id;
@@ -146,6 +179,36 @@ async function initializeAuth() {
   });
 }
 
+/**
+ * Auto-refresh the feed when posts, comments or likes change server-side.
+ * Reloads are debounced and quiet; if Realtime is disabled on the project
+ * the subscription simply never fires and manual refresh keeps working.
+ */
+function subscribeToChanges() {
+  let timer;
+  const bump = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => loadPosts({ quiet: true }), REALTIME_DEBOUNCE);
+  };
+
+  db.channel("today-pieces-feed")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "posts" },
+      bump,
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "comments" },
+      bump,
+    )
+    .subscribe();
+}
+
+const relativeFormatter = new Intl.RelativeTimeFormat("ko", {
+  numeric: "auto",
+});
+
 function formatDate(value) {
   return new Intl.DateTimeFormat("ko-KR", {
     month: "long",
@@ -153,6 +216,38 @@ function formatDate(value) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+/** Human friendly "3분 전" style label; falls back to a full date past a week. */
+function formatRelative(value) {
+  const diff = new Date(value).getTime() - Date.now();
+  const abs = Math.abs(diff);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (abs < 45 * 1000) return "방금 전";
+  if (abs < hour) return relativeFormatter.format(Math.round(diff / minute), "minute");
+  if (abs < day) return relativeFormatter.format(Math.round(diff / hour), "hour");
+  if (abs < 7 * day) return relativeFormatter.format(Math.round(diff / day), "day");
+  return formatDate(value);
+}
+
+function createTime(value, className) {
+  return el("time", {
+    class: className,
+    dateTime: value,
+    title: formatDate(value),
+    dataset: { ts: value },
+    textContent: formatRelative(value),
+  });
+}
+
+/** Keep every rendered timestamp fresh without re-fetching the feed. */
+function refreshTimestamps() {
+  feed.querySelectorAll("time[data-ts]").forEach((node) => {
+    node.textContent = formatRelative(node.dataset.ts);
+  });
 }
 
 function getPublicImageUrl(path) {
@@ -167,249 +262,261 @@ function getPostComments(post) {
 }
 
 function createCommentElement(comment) {
-  const item = document.createElement("div");
-  item.className = "comment";
-  item.dataset.commentId = comment.id;
+  const owner = isOwner(comment.author_id);
 
-  const bubble = document.createElement("div");
-  bubble.className = "comment-bubble";
+  const bubble = el(
+    "div",
+    { class: "comment-bubble" },
+    el("p", { class: "comment-message", textContent: comment.message }),
+    el(
+      "div",
+      { class: "comment-tools" },
+      createTime(comment.created_at),
+      el("span", {
+        class: "comment-author",
+        textContent: getAuthorLabel(comment.author_id),
+      }),
+      owner &&
+        el("button", {
+          class: "comment-action",
+          type: "button",
+          dataset: { action: "edit-comment" },
+          textContent: "EDIT",
+        }),
+      owner &&
+        el("button", {
+          class: "comment-action",
+          type: "button",
+          dataset: { action: "delete-comment" },
+          textContent: "DEL",
+        }),
+    ),
+  );
 
-  const message = document.createElement("p");
-  message.className = "comment-message";
-  message.textContent = comment.message;
+  const editForm = el(
+    "form",
+    { class: "comment-edit-form", hidden: true },
+    el("input", {
+      class: "comment-edit-input",
+      maxLength: COMMENT_MAXLEN,
+      required: true,
+      value: comment.message,
+      "aria-label": "댓글 수정",
+    }),
+    el("button", { type: "submit", textContent: "SAVE" }),
+    el("button", {
+      type: "button",
+      dataset: { action: "cancel-comment-edit" },
+      textContent: "CANCEL",
+    }),
+  );
 
-  const tools = document.createElement("div");
-  tools.className = "comment-tools";
-
-  const meta = document.createElement("time");
-  meta.dateTime = comment.created_at;
-  meta.textContent = formatDate(comment.created_at);
-
-  const editButton = document.createElement("button");
-  editButton.className = "comment-action";
-  editButton.type = "button";
-  editButton.dataset.action = "edit-comment";
-  editButton.textContent = "EDIT";
-
-  const deleteButton = document.createElement("button");
-  deleteButton.className = "comment-action";
-  deleteButton.type = "button";
-  deleteButton.dataset.action = "delete-comment";
-  deleteButton.textContent = "DEL";
-
-  const author = document.createElement("span");
-  author.className = "comment-author";
-  author.textContent = getAuthorLabel(comment.author_id);
-
-  tools.append(meta, author);
-  if (isOwner(comment.author_id)) tools.append(editButton, deleteButton);
-  bubble.append(message, tools);
-
-  const editForm = document.createElement("form");
-  editForm.className = "comment-edit-form";
-  editForm.hidden = true;
-
-  const editInput = document.createElement("input");
-  editInput.className = "comment-edit-input";
-  editInput.maxLength = 280;
-  editInput.required = true;
-  editInput.value = comment.message;
-  editInput.setAttribute("aria-label", "댓글 수정");
-
-  const editSave = document.createElement("button");
-  editSave.type = "submit";
-  editSave.textContent = "SAVE";
-
-  const editCancel = document.createElement("button");
-  editCancel.type = "button";
-  editCancel.dataset.action = "cancel-comment-edit";
-  editCancel.textContent = "CANCEL";
-
-  editForm.append(editInput, editSave, editCancel);
-  item.append(bubble, editForm);
-  return item;
+  return el(
+    "div",
+    { class: "comment", dataset: { commentId: comment.id } },
+    bubble,
+    editForm,
+  );
 }
 
 function createSocialArea(post) {
-  const social = document.createElement("section");
-  social.className = "post-social";
-  social.setAttribute("aria-label", "좋아요와 댓글");
-
-  const socialTop = document.createElement("div");
-  socialTop.className = "social-top";
-
-  const heartButton = document.createElement("button");
-  heartButton.className = "heart-button";
-  heartButton.type = "button";
-  heartButton.dataset.action = "like";
-  heartButton.setAttribute("aria-label", "좋아요");
-  heartButton.innerHTML = `<span aria-hidden="true">${likedPosts[post.id] ? "♥" : "♡"}</span><strong>${post.likes_count || 0}</strong>`;
-  if (likedPosts[post.id]) {
-    heartButton.classList.add("is-liked");
-    heartButton.disabled = true;
-  }
-
-  const commentCount = document.createElement("span");
-  commentCount.className = "comment-count";
   const comments = getPostComments(post);
-  commentCount.textContent = `${comments.length} comment${comments.length === 1 ? "" : "s"}`;
+  const liked = Boolean(likedPosts[post.id]);
 
-  socialTop.append(heartButton, commentCount);
+  const heartButton = el("button", {
+    class: liked ? "heart-button is-liked" : "heart-button",
+    type: "button",
+    disabled: liked,
+    dataset: { action: "like" },
+    "aria-label": "좋아요",
+    html: `<span aria-hidden="true">${liked ? "♥" : "♡"}</span><strong>${post.likes_count || 0}</strong>`,
+  });
 
-  const commentList = document.createElement("div");
-  commentList.className = "comments";
-  if (comments.length) {
-    commentList.append(...comments.map(createCommentElement));
-  }
+  const socialTop = el(
+    "div",
+    { class: "social-top" },
+    heartButton,
+    el("span", {
+      class: "comment-count",
+      textContent: `${comments.length} comment${comments.length === 1 ? "" : "s"}`,
+    }),
+  );
 
-  const commentForm = document.createElement("form");
-  commentForm.className = "comment-form";
+  const commentList = el("div", { class: "comments" });
+  if (comments.length) commentList.append(...comments.map(createCommentElement));
 
-  const commentInput = document.createElement("input");
-  commentInput.className = "comment-input";
-  commentInput.maxLength = 280;
-  commentInput.required = true;
-  commentInput.placeholder = "say less, comment more";
-  commentInput.setAttribute("aria-label", "댓글");
-  commentInput.readOnly = !currentUser;
-  if (!currentUser) commentInput.placeholder = "login to comment";
+  const commentForm = el(
+    "form",
+    { class: "comment-form" },
+    el("input", {
+      class: "comment-input",
+      maxLength: COMMENT_MAXLEN,
+      required: true,
+      readOnly: !currentUser,
+      placeholder: currentUser ? "say less, comment more" : "login to comment",
+      "aria-label": "댓글",
+    }),
+    el("button", {
+      type: "submit",
+      textContent: "SEND",
+      disabled: !currentUser,
+    }),
+  );
 
-  const commentButton = document.createElement("button");
-  commentButton.type = "submit";
-  commentButton.textContent = "SEND";
-  commentButton.disabled = !currentUser;
+  return el(
+    "section",
+    { class: "post-social", "aria-label": "좋아요와 댓글" },
+    socialTop,
+    commentList,
+    commentForm,
+  );
+}
 
-  commentForm.append(commentInput, commentButton);
-  social.append(socialTop, commentList, commentForm);
-  return social;
+function createEditForm(post) {
+  const mediaRow = el(
+    "div",
+    { class: "edit-media-row" },
+    el(
+      "label",
+      {
+        class: "edit-photo-button",
+        textContent: post.image_path ? "REPLACE PIC" : "ADD A PIC",
+      },
+      el("input", {
+        class: "edit-photo-input",
+        type: "file",
+        accept: ALLOWED_TYPES.join(","),
+      }),
+    ),
+    el("span", { class: "edit-file-name", textContent: "NO NEW FILE" }),
+    post.image_path &&
+      el("button", {
+        class: "remove-photo-button",
+        type: "button",
+        dataset: { action: "remove-photo", removeImage: "false" },
+        textContent: "REMOVE PIC",
+      }),
+  );
+
+  return el(
+    "form",
+    { class: "edit-form", hidden: true },
+    el("textarea", {
+      class: "edit-message",
+      maxLength: MESSAGE_MAXLEN,
+      required: true,
+      value: post.message,
+      "aria-label": "게시물 내용 수정",
+    }),
+    mediaRow,
+    el(
+      "div",
+      { class: "edit-actions" },
+      el("button", {
+        class: "edit-cancel",
+        type: "button",
+        dataset: { action: "cancel-edit" },
+        textContent: "CANCEL",
+      }),
+      el("button", {
+        class: "edit-save",
+        type: "submit",
+        textContent: "SAVE CHANGES",
+      }),
+    ),
+  );
 }
 
 function createPostElement(post) {
-  const article = document.createElement("article");
-  article.className = "post";
-  article.dataset.postId = post.id;
-  article.dataset.imagePath = post.image_path || "";
+  const isNew = !seenPostIds.has(post.id);
+  seenPostIds.add(post.id);
+
+  const article = el("article", {
+    class: isNew ? "post is-new" : "post",
+    dataset: { postId: post.id, imagePath: post.image_path || "" },
+  });
 
   if (post.image_path) {
-    const imageWrap = document.createElement("div");
-    imageWrap.className = "post-image-wrap";
-
-    const image = document.createElement("img");
-    image.className = "post-image";
-    image.src = getPublicImageUrl(post.image_path);
-    image.alt = "게시글에 첨부된 사진";
-    image.loading = "lazy";
-
-    imageWrap.append(image);
-    article.append(imageWrap);
+    article.append(
+      el(
+        "div",
+        { class: "post-image-wrap" },
+        el("img", {
+          class: "post-image",
+          src: getPublicImageUrl(post.image_path),
+          alt: "게시글에 첨부된 사진",
+          loading: "lazy",
+        }),
+      ),
+    );
   }
 
-  const body = document.createElement("div");
-  body.className = "post-body";
+  const owner = isOwner(post.author_id);
+  const metaRow = el(
+    "div",
+    { class: "post-meta-row" },
+    createTime(post.created_at, "post-meta"),
+    el("span", {
+      class: "post-author",
+      textContent: getAuthorLabel(post.author_id),
+    }),
+    owner &&
+      el(
+        "div",
+        { class: "post-actions" },
+        el("button", {
+          class: "post-action",
+          type: "button",
+          dataset: { action: "edit" },
+          textContent: "EDIT",
+          "aria-label": "게시물 수정",
+        }),
+        el("button", {
+          class: "post-action",
+          type: "button",
+          dataset: { action: "delete" },
+          textContent: "DELETE",
+          "aria-label": "게시물 삭제",
+        }),
+      ),
+  );
 
-  const metaRow = document.createElement("div");
-  metaRow.className = "post-meta-row";
+  const body = el(
+    "div",
+    { class: "post-body" },
+    metaRow,
+    el("p", { class: "post-message", textContent: post.message }),
+    createEditForm(post),
+    createSocialArea(post),
+  );
 
-  const meta = document.createElement("time");
-  meta.className = "post-meta";
-  meta.dateTime = post.created_at;
-  meta.textContent = formatDate(post.created_at);
-
-  const actions = document.createElement("div");
-  actions.className = "post-actions";
-
-  const editButton = document.createElement("button");
-  editButton.className = "post-action";
-  editButton.type = "button";
-  editButton.dataset.action = "edit";
-  editButton.textContent = "EDIT";
-  editButton.setAttribute("aria-label", "게시물 수정");
-
-  const deleteButton = document.createElement("button");
-  deleteButton.className = "post-action";
-  deleteButton.type = "button";
-  deleteButton.dataset.action = "delete";
-  deleteButton.textContent = "DELETE";
-  deleteButton.setAttribute("aria-label", "게시물 삭제");
-
-  actions.append(editButton, deleteButton);
-  const author = document.createElement("span");
-  author.className = "post-author";
-  author.textContent = getAuthorLabel(post.author_id);
-
-  metaRow.append(meta, author);
-  if (isOwner(post.author_id)) metaRow.append(actions);
-
-  const message = document.createElement("p");
-  message.className = "post-message";
-  message.textContent = post.message;
-
-  const editForm = document.createElement("form");
-  editForm.className = "edit-form";
-  editForm.hidden = true;
-
-  const editMessage = document.createElement("textarea");
-  editMessage.className = "edit-message";
-  editMessage.maxLength = 500;
-  editMessage.required = true;
-  editMessage.value = post.message;
-  editMessage.setAttribute("aria-label", "게시물 내용 수정");
-
-  const editMediaRow = document.createElement("div");
-  editMediaRow.className = "edit-media-row";
-
-  const editPhotoLabel = document.createElement("label");
-  editPhotoLabel.className = "edit-photo-button";
-  editPhotoLabel.textContent = post.image_path ? "REPLACE PIC" : "ADD A PIC";
-
-  const editPhotoInput = document.createElement("input");
-  editPhotoInput.className = "edit-photo-input";
-  editPhotoInput.type = "file";
-  editPhotoInput.accept = ALLOWED_TYPES.join(",");
-
-  const editFileName = document.createElement("span");
-  editFileName.className = "edit-file-name";
-  editFileName.textContent = "NO NEW FILE";
-
-  editPhotoLabel.append(editPhotoInput);
-  editMediaRow.append(editPhotoLabel, editFileName);
-
-  if (post.image_path) {
-    const removePhotoButton = document.createElement("button");
-    removePhotoButton.className = "remove-photo-button";
-    removePhotoButton.type = "button";
-    removePhotoButton.dataset.action = "remove-photo";
-    removePhotoButton.dataset.removeImage = "false";
-    removePhotoButton.textContent = "REMOVE PIC";
-    editMediaRow.append(removePhotoButton);
-  }
-
-  const editActions = document.createElement("div");
-  editActions.className = "edit-actions";
-
-  const editCancel = document.createElement("button");
-  editCancel.className = "edit-cancel";
-  editCancel.type = "button";
-  editCancel.dataset.action = "cancel-edit";
-  editCancel.textContent = "CANCEL";
-
-  const editSave = document.createElement("button");
-  editSave.className = "edit-save";
-  editSave.type = "submit";
-  editSave.textContent = "SAVE CHANGES";
-
-  editActions.append(editCancel, editSave);
-  editForm.append(editMessage, editMediaRow, editActions);
-
-  body.append(metaRow, message, editForm, createSocialArea(post));
   article.append(body);
   return article;
 }
 
+function renderSkeletons(count = 4) {
+  feed.replaceChildren(
+    ...Array.from({ length: count }, () =>
+      el(
+        "article",
+        { class: "post skeleton", "aria-hidden": "true" },
+        el("div", { class: "skeleton-image" }),
+        el(
+          "div",
+          { class: "post-body" },
+          el("div", { class: "skeleton-line short" }),
+          el("div", { class: "skeleton-line" }),
+          el("div", { class: "skeleton-line" }),
+        ),
+      ),
+    ),
+  );
+}
+
 async function loadPosts({ quiet = false } = {}) {
   if (!quiet) {
-    status.textContent = "기록을 불러오는 중...";
-    feed.replaceChildren();
+    status.textContent = "";
+    renderSkeletons();
   }
 
   refreshButton.disabled = true;
@@ -419,28 +526,29 @@ async function loadPosts({ quiet = false } = {}) {
       "id, message, image_path, created_at, likes_count, author_id, comments(id, post_id, message, created_at, updated_at, author_id)",
     )
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(FEED_LIMIT);
   refreshButton.disabled = false;
 
   if (error) {
+    feed.replaceChildren();
     status.textContent = "기록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.";
-    showToast(`불러오기 실패: ${error.message}`);
+    errorToast("불러오기 실패", error);
     return;
   }
 
   status.textContent = "";
-  feed.replaceChildren();
 
   if (!data.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty";
-    empty.innerHTML =
-      "<strong>THE TIMELINE IS EMPTY</strong>첫 번째 조각을 툭 던져보세요. 아무 말이나 진짜 환영.";
-    feed.append(empty);
+    feed.replaceChildren(
+      el("div", {
+        class: "empty",
+        html: "<strong>THE TIMELINE IS EMPTY</strong>첫 번째 조각을 툭 던져보세요. 아무 말이나 진짜 환영.",
+      }),
+    );
     return;
   }
 
-  feed.append(...data.map(createPostElement));
+  feed.replaceChildren(...data.map(createPostElement));
 }
 
 function clearSelectedImage() {
@@ -475,11 +583,19 @@ async function uploadPhoto(file) {
 }
 
 messageInput.addEventListener("input", () => {
-  charCount.textContent = `${messageInput.value.length} / 500`;
+  charCount.textContent = `${messageInput.value.length} / ${MESSAGE_MAXLEN}`;
 });
 
 messageInput.addEventListener("focus", () => {
   if (!currentUser) openAuth("signup");
+});
+
+// Ctrl / Cmd + Enter posts straight from the textarea.
+messageInput.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault();
+    form.requestSubmit();
+  }
 });
 
 photoButton.addEventListener("click", (event) => {
@@ -709,7 +825,7 @@ feed.addEventListener("submit", async (event) => {
     if (uploadedImagePath) {
       await db.storage.from(STORAGE_BUCKET).remove([uploadedImagePath]);
     }
-    showToast(`수정 실패: ${error.message}`);
+    errorToast("수정 실패", error);
     saveButton.disabled = false;
     saveButton.textContent = "SAVE CHANGES";
   }
@@ -735,7 +851,7 @@ async function likePost(button) {
     button.querySelector("strong").textContent = data;
   } catch (error) {
     button.disabled = false;
-    showToast(`좋아요 실패: ${error.message}`);
+    errorToast("좋아요 실패", error);
   }
 }
 
@@ -770,7 +886,7 @@ async function addComment(commentForm) {
     showToast("댓글을 남겼어요.");
     await loadPosts({ quiet: true });
   } catch (error) {
-    showToast(`댓글 실패: ${error.message}`);
+    errorToast("댓글 실패", error);
   } finally {
     button.disabled = false;
     button.textContent = "SEND";
@@ -801,7 +917,7 @@ async function editComment(commentForm) {
     showToast("댓글을 수정했어요.");
     await loadPosts({ quiet: true });
   } catch (error) {
-    showToast(`댓글 수정 실패: ${error.message}`);
+    errorToast("댓글 수정 실패", error);
   } finally {
     button.disabled = false;
     button.textContent = "SAVE";
@@ -821,7 +937,7 @@ async function deleteComment(comment) {
     showToast("댓글을 삭제했어요.");
     await loadPosts({ quiet: true });
   } catch (error) {
-    showToast(`댓글 삭제 실패: ${error.message}`);
+    errorToast("댓글 삭제 실패", error);
   }
 }
 
@@ -859,7 +975,7 @@ confirmDeleteButton.addEventListener("click", async () => {
     showToast("게시물을 삭제했어요.");
     await loadPosts({ quiet: true });
   } catch (error) {
-    showToast(`삭제 실패: ${error.message}`);
+    errorToast("삭제 실패", error);
   } finally {
     confirmDeleteButton.disabled = false;
     confirmDeleteButton.textContent = "YEP, DELETE";
@@ -905,7 +1021,7 @@ form.addEventListener("submit", async (event) => {
     if (imagePath) {
       await db.storage.from(STORAGE_BUCKET).remove([imagePath]);
     }
-    showToast(`기록 실패: ${error.message}`);
+    errorToast("기록 실패", error);
   } finally {
     submitButton.disabled = false;
     submitButton.querySelector("span").textContent = "POST IT";
@@ -961,10 +1077,11 @@ authForm.addEventListener("submit", async (event) => {
 signOutButton.addEventListener("click", async () => {
   const { error } = await db.auth.signOut();
   if (error) {
-    showToast(`로그아웃 실패: ${error.message}`);
+    errorToast("로그아웃 실패", error);
     return;
   }
   showToast("로그아웃했어요.");
 });
 
+setInterval(refreshTimestamps, TIME_TICK);
 initializeAuth();
