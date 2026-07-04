@@ -66,6 +66,26 @@ body[data-theme="hitel"] {
   text-shadow: 0 0 8px rgba(0, 240, 255, 0.38);
 }
 
+body[data-theme="night"] {
+  --cream: #14131a;
+  --ink: #f4f1ff;
+  --pink: #ff5ea8;
+  --pink-soft: #2a2140;
+  --blue: #8b9bff;
+  --acid: #b6ff5a;
+  --butter: #3a2f12;
+  --orange: #ff8a4b;
+  --white: #1c1b26;
+  --line: 2px solid #3d3856;
+  --shadow-sm: 4px 4px 0 #000000;
+  --shadow: 8px 8px 0 #000000;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    #14131a;
+  background-size: 24px 24px;
+}
+
 button,
 textarea,
 input {
@@ -1732,6 +1752,79 @@ footer > span {
   footer p {
     display: none;
   }
+}
+
+/* --- Card redesign: calm aligned grid with a colored top accent --- */
+.post {
+  margin-top: 0 !important;
+  transform: none !important;
+  border-radius: 16px;
+}
+
+.post:hover {
+  transform: translate(-4px, -4px) !important;
+  box-shadow: 12px 12px 0 var(--ink);
+}
+
+/* Turn the washi-tape tab into a clean full-width accent bar. */
+.post::before {
+  top: 0;
+  right: 0;
+  left: 0;
+  width: 100%;
+  height: 9px;
+  border-radius: 14px 14px 0 0;
+  transform: none !important;
+}
+
+.post:nth-child(4n + 1)::before {
+  background: var(--pink);
+}
+.post:nth-child(4n + 2)::before {
+  background: var(--blue);
+}
+.post:nth-child(4n + 3)::before {
+  background: var(--acid);
+}
+.post:nth-child(4n)::before {
+  background: var(--butter);
+}
+
+.post-image-wrap {
+  margin-top: 9px;
+  border-radius: 0;
+}
+
+.post-body {
+  padding-top: 22px;
+}
+
+/* Author gets a colored dot so each poster reads at a glance. */
+.post-author {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.post-author::before {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--blue);
+  content: "";
+}
+
+.post:nth-child(3n + 2) .post-author::before {
+  background: var(--pink);
+}
+.post:nth-child(3n) .post-author::before {
+  background: var(--acid);
+}
+
+/* Drop the repeated hashtag stamp for a cleaner message block. */
+.post-message::after {
+  display: none;
 }
 
 /* New posts slide in once; existing ones stay put on quiet refreshes. */
