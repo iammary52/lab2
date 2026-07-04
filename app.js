@@ -80,8 +80,10 @@ let currentUser = null;
 let authMode = "signin";
 const seenPostIds = new Set();
 
+const THEMES = ["default", "hitel", "night"];
+
 function setTheme(theme) {
-  const nextTheme = theme === "hitel" ? "hitel" : "default";
+  const nextTheme = THEMES.includes(theme) ? theme : "default";
   document.body.dataset.theme = nextTheme;
   localStorage.setItem(THEME_KEY, nextTheme);
   themeButtons.forEach((button) => {
